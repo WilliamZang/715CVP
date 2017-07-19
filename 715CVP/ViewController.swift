@@ -23,6 +23,8 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         // Show statistics such as fps and timing information
         sceneView.showsStatistics = true
         
+        sceneView.debugOptions = [ARSCNDebugOptions.showFeaturePoints, ARSCNDebugOptions.showWorldOrigin]
+        
         // Create a new scene
         let scene = SCNScene(named: "art.scnassets/ship.scn")!
         
@@ -35,6 +37,8 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         
         // Create a session configuration
         let configuration = ARWorldTrackingSessionConfiguration()
+        
+        configuration.planeDetection = .horizontal
         
         // Run the view's session
         sceneView.session.run(configuration)
@@ -62,6 +66,55 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         return node
     }
 */
+    var shownBumblebee = false
+    func makePlaneNode(_ anchor: ARAnchor) -> SCNNode? {
+        if shownBumblebee { return nil }
+        shownBumblebee = true
+        guard let planeAnchor = anchor as? ARPlaneAnchor else { return nil }
+        
+        let plane = SCNPlane(width: CGFloat(planeAnchor.extent.x), height: CGFloat(planeAnchor.extent.z))
+        let grassImage = UIImage(named: "grass")
+        let grassMaterial = SCNMaterial()
+        grassMaterial.diffuse.contents = grassImage
+        grassMaterial.isDoubleSided = true
+        plane.materials = [grassMaterial]
+        // Create a plane node with the plane geometry
+        let planeNode = SCNNode(geometry: plane)
+        planeNode.position = SCNVector3Make(planeAnchor.center.x, 0, planeAnchor.center.y)
+        planeNode.transform = SCNMatrix4MakeRotation(-Float.pi / 2, 1, 0, 0)
+        
+        let scene = SCNScene(named: "art.scnassets/bumblebee/bumblebee.scn")!
+        if let bumblebeeNode = scene.rootNode.childNode(withName: "root", recursively: false) {
+            bumblebeeNode.position = SCNVector3Zero
+            bumblebeeNode.transform = SCNMatrix4MakeRotation(Float.pi / 2, 1, 0, 0)
+            planeNode.addChildNode(bumblebeeNode)
+        }
+        
+        return planeNode
+    }
+    
+    func resetPlane(_ node: SCNNode) {
+        node.childNodes.forEach { $0.removeFromParentNode() }
+        shownBumblebee = false
+    }
+    
+    func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
+        if let planeNode = makePlaneNode(anchor) {
+            node.addChildNode(planeNode)
+        }
+    }
+    
+    func renderer(_ renderer: SCNSceneRenderer, didUpdate node: SCNNode, for anchor: ARAnchor) {
+        resetPlane(node)
+        if let planeNode = makePlaneNode(anchor) {
+            node.addChildNode(planeNode)
+        }
+    }
+    
+    func renderer(_ renderer: SCNSceneRenderer, didRemove node: SCNNode, for anchor: ARAnchor) {
+        resetPlane(node)
+    }
+    
     
     func session(_ session: ARSession, didFailWithError error: Error) {
         // Present an error message to the user
